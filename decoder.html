@@ -5,22 +5,49 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Morse + Caesar Decoder (Shift 3)</title>
   <style>
-    :root{--bg:#101820;--panel:#182437;--ink:#eee;--muted:#99a3b5;--accent:#5ec8f8;--chip:#0e1420;}
+    :root{
+      --bg:#101820;
+      --panel:#182437;
+      --ink:#eee;
+      --muted:#99a3b5;
+      --accent:#ff6ec7; /* pink accent like welcome page */
+      --chip:#0e1420;
+    }
     *{box-sizing:border-box}
-    body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink);padding:20px;margin:0;display:flex;justify-content:center}
+    body{
+      font-family:Arial,Helvetica,sans-serif;
+      background:var(--bg);
+      color:var(--ink);
+      padding:20px;
+      margin:0;
+      display:flex;
+      justify-content:center;
+    }
     .wrap{width:clamp(320px, 90vw, 920px)}
-    h1{color:var(--accent);margin:0 0 10px}
-    p{color:var(--muted);margin:6px 0}
-    textarea{width:100%;height:90px;margin:10px 0;border-radius:10px;padding:12px;font-size:16px;background:var(--panel);color:#fff;border:1px solid rgba(255,255,255,.08);resize:none}
-    button{margin:6px 6px 0 0;padding:12px 18px;border:none;border-radius:10px;background:var(--accent);color:#000;font-weight:700;cursor:pointer;transition:.2s}
+    h1{color:var(--accent);margin:0 0 10px;text-align:center}
+    p{color:var(--muted);margin:6px 0;text-align:center}
+    textarea{
+      width:100%;height:90px;margin:10px 0;border-radius:10px;
+      padding:12px;font-size:16px;
+      background:var(--panel);color:#fff;
+      border:1px solid rgba(255,255,255,.08);resize:none
+    }
+    button{
+      margin:6px 6px 0 0;padding:12px 18px;border:none;
+      border-radius:10px;background:var(--accent);color:#000;
+      font-weight:700;cursor:pointer;transition:.2s
+    }
     button:hover{filter:brightness(.95)}
-    video{width:100%;max-width:520px;border:2px solid var(--accent);border-radius:12px;margin-top:10px;background:#000}
     .section{margin:20px 0;padding:18px;background:var(--panel);border-radius:12px}
     h2{margin:0 0 12px;color:var(--accent)}
     .output{background:var(--chip);padding:10px;border-radius:10px}
-    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-    .status{margin-top:8px;font-size:14px;color:var(--muted)}
-    .kbd{display:inline-block;border:1px solid rgba(255,255,255,.15);border-bottom-width:3px;border-radius:6px;padding:2px 6px;background:#0d1625;color:#cfe9ff}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center}
+    .status{margin-top:8px;font-size:14px;color:var(--muted);text-align:center}
+    .kbd{
+      display:inline-block;border:1px solid rgba(255,255,255,.15);
+      border-bottom-width:3px;border-radius:6px;padding:2px 6px;
+      background:#0d1625;color:#cfe9ff
+    }
     .tiny{font-size:12px;color:var(--muted)}
   </style>
 </head>
@@ -28,31 +55,19 @@
   <div class="wrap">
     <h1>Morse → Caesar (Shift 3) → Plain Text</h1>
     <p class="tiny">
-      Tip: Use <span class="kbd">·</span> (dot) and <span class="kbd">−</span> (dash). Separate letters with spaces, words with <span class="kbd">/</span>.
+      Tip: Use <span class="kbd">·</span> (dot) and <span class="kbd">−</span> (dash). Separate letters with spaces, words with <span class="kbd">/</span>.<br>
       Example: <span class="kbd">.... . .-.. .-.. --- / .-- --- .-. .-.. -..</span>
     </p>
 
     <!-- Manual -->
     <div class="section">
-      <p><b>Option 1:</b> Enter Morse manually</p>
+      <p><b>Enter Morse Code manually</b></p>
       <textarea id="morseInput" placeholder="Example: .... . .-.. .-.. --- / .-- --- .-. .-.. -.."></textarea>
       <div class="row">
         <button id="decodeBtn">Decode</button>
         <button id="clearBtn" style="background:#cfe9ff;">Clear</button>
       </div>
       <div class="status" id="manualStatus"></div>
-    </div>
-
-    <!-- Camera -->
-    <div class="section">
-      <p><b>Option 2:</b> Use camera to detect light pulses</p>
-      <video id="video" autoplay playsinline></video>
-      <div class="row">
-        <button id="startBtn">Start Camera</button>
-        <button id="switchBtn">Switch Camera</button>
-        <button id="scanBtn">Scan Morse (5s)</button>
-      </div>
-      <div class="status" id="camStatus">Status: idle.</div>
     </div>
 
     <!-- Results -->
@@ -66,7 +81,6 @@
   </div>
 
   <script>
-    // ---------- Mappings ----------
     const morseMap = {
       ".-":"A","-...":"B","-.-.":"C","-..":"D",".":"E","..-.":"F",
       "--.":"G","....":"H","..":"I",".---":"J","-.-":"K",".-..":"L",
@@ -111,151 +125,6 @@
       $("#plainOut").value = "";
       $("#manualStatus").textContent = "Cleared.";
     });
-
-    // ---------- Camera logic ----------
-    const video = $("#video");
-    let stream = null;
-    let scanning = false;
-    let useBackCamera = true; // default to back camera
-
-    $("#startBtn").addEventListener("click", startCamera);
-    $("#scanBtn").addEventListener("click", scanMorse);
-    $("#switchBtn").addEventListener("click", switchCamera);
-
-    async function startCamera() {
-      if (location.protocol !== "https:" && location.hostname !== "localhost") {
-        $("#camStatus").textContent = "Error: Camera only works on https or http://localhost.";
-        return;
-      }
-
-      // stop old stream if running
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: useBackCamera ? "environment" : "user" } }
-        });
-        video.srcObject = stream;
-        $("#camStatus").textContent = (useBackCamera ? "Back" : "Front") + " camera started. Aim at light pulses.";
-      } catch (err) {
-        $("#camStatus").textContent = "Camera error: " + err.message;
-        console.error(err);
-      }
-    }
-
-    function switchCamera() {
-      useBackCamera = !useBackCamera;
-      startCamera();
-    }
-
-    // ---------- Scan Morse ----------
-    async function scanMorse() {
-      if (!stream) { $("#camStatus").textContent = "Start camera first."; return; }
-      if (scanning) return;
-      scanning = true;
-      $("#camStatus").textContent = "Scanning for ~5s…";
-
-      const useImageCapture = "ImageCapture" in window;
-      const track = stream.getVideoTracks()[0];
-      const cap = useImageCapture ? new ImageCapture(track) : null;
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      const samples = [];
-      const started = performance.now();
-      const durationMs = 5000;
-      const sampleEveryMs = 80;
-
-      while (performance.now() - started < durationMs) {
-        let w, h, data;
-        if (useImageCapture) {
-          try {
-            const bmp = await cap.grabFrame();
-            w = canvas.width  = Math.max(64, Math.floor(bmp.width / 4));
-            h = canvas.height = Math.max(64, Math.floor(bmp.height / 4));
-            ctx.drawImage(bmp, 0, 0, w, h);
-            data = ctx.getImageData(0, 0, w, h).data;
-          } catch {
-            w = canvas.width = video.videoWidth || 160;
-            h = canvas.height = video.videoHeight || 120;
-            ctx.drawImage(video, 0, 0, w, h);
-            data = ctx.getImageData(0, 0, w, h).data;
-          }
-        } else {
-          w = canvas.width = video.videoWidth || 160;
-          h = canvas.height = video.videoHeight || 120;
-          ctx.drawImage(video, 0, 0, w, h);
-          data = ctx.getImageData(0, 0, w, h).data;
-        }
-
-        let sum = 0, count = 0;
-        const x0 = Math.floor(w * 0.3), x1 = Math.floor(w * 0.7);
-        const y0 = Math.floor(h * 0.3), y1 = Math.floor(h * 0.7);
-        for (let y = y0; y < y1; y++) {
-          for (let x = x0; x < x1; x++) {
-            const idx = (y * w + x) * 4;
-            sum += data[idx] + data[idx + 1] + data[idx + 2];
-            count++;
-          }
-        }
-        const bright = sum / (count * 3);
-        samples.push({ t: performance.now(), b: bright });
-
-        await new Promise(r => setTimeout(r, sampleEveryMs));
-      }
-
-      const morse = brightnessToMorse(samples);
-      $("#morseInput").value = morse;
-      processMorse();
-      $("#camStatus").textContent = "Scan complete. Parsed Morse: " + (morse || "(none)");
-      scanning = false;
-    }
-
-    function brightnessToMorse(samples) {
-      if (!samples.length) return "";
-      const smoothed = samples.map((s,i,arr) => {
-        const w = 3;
-        let sum = 0, n = 0;
-        for (let k = -w; k <= w; k++) {
-          const j = i + k;
-          if (j >= 0 && j < arr.length) { sum += arr[j].b; n++; }
-        }
-        return { t: s.t, b: sum / n };
-      });
-
-      const bs = smoothed.map(s => s.b);
-      const minB = Math.min(...bs), maxB = Math.max(...bs);
-      const threshold = (minB + maxB) / 2;
-
-      let morse = "";
-      let isOn = false;
-      let onStart = 0, offStart = smoothed[0].t;
-
-      const dotMax = 180;
-      const gapCharMin = 3 * dotMax;
-      const gapWordMin = 7 * dotMax;
-
-      for (let i = 1; i < smoothed.length; i++) {
-        const cur = smoothed[i];
-        const wasOn = isOn;
-        isOn = cur.b > threshold;
-
-        if (!wasOn && isOn) {
-          const gapDur = cur.t - offStart;
-          if (gapDur >= gapWordMin)      morse += " / ";
-          else if (gapDur >= gapCharMin) morse += " ";
-          onStart = cur.t;
-        } else if (wasOn && !isOn) {
-          const pulse = cur.t - onStart;
-          morse += (pulse <= dotMax) ? "." : "-";
-          offStart = cur.t;
-        }
-      }
-      return morse.trim();
-    }
   </script>
 </body>
 </html>
