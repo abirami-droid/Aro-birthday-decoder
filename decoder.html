@@ -49,6 +49,7 @@
       <video id="video" autoplay playsinline></video>
       <div class="row">
         <button id="startBtn">Start Camera</button>
+        <button id="switchBtn">Switch Camera</button>
         <button id="scanBtn">Scan Morse (5s)</button>
       </div>
       <div class="status" id="camStatus">Status: idle.</div>
@@ -76,7 +77,6 @@
       ".....":"5","-....":"6","--...":"7","---..":"8","----.":"9"
     };
 
-    // ---------- Helpers ----------
     const $ = sel => document.querySelector(sel);
 
     function morseToText(morse) {
@@ -99,12 +99,11 @@
       const raw = $("#morseInput").value.trim().replace(/\s+/g, " ").replace(/\//g, " / ");
       const caesar = morseToText(raw);
       $("#caesarOut").value = caesar;
-      const plain = caesarDecode(caesar, 3); // Always shift = 3
+      const plain = caesarDecode(caesar, 3);
       $("#plainOut").value = plain;
       $("#manualStatus").textContent = raw ? "Decoded with Caesar shift 3." : "Nothing to decode.";
     }
 
-    // ---------- UI wiring ----------
     $("#decodeBtn").addEventListener("click", processMorse);
     $("#clearBtn").addEventListener("click", () => {
       $("#morseInput").value = "";
@@ -117,25 +116,41 @@
     const video = $("#video");
     let stream = null;
     let scanning = false;
+    let useBackCamera = true; // default to back camera
 
     $("#startBtn").addEventListener("click", startCamera);
     $("#scanBtn").addEventListener("click", scanMorse);
+    $("#switchBtn").addEventListener("click", switchCamera);
 
     async function startCamera() {
       if (location.protocol !== "https:" && location.hostname !== "localhost") {
         $("#camStatus").textContent = "Error: Camera only works on https or http://localhost.";
         return;
       }
+
+      // stop old stream if running
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: useBackCamera ? "environment" : "user" } }
+        });
         video.srcObject = stream;
-        $("#camStatus").textContent = "Camera started. Aim at light pulses.";
+        $("#camStatus").textContent = (useBackCamera ? "Back" : "Front") + " camera started. Aim at light pulses.";
       } catch (err) {
         $("#camStatus").textContent = "Camera error: " + err.message;
         console.error(err);
       }
     }
 
+    function switchCamera() {
+      useBackCamera = !useBackCamera;
+      startCamera();
+    }
+
+    // ---------- Scan Morse ----------
     async function scanMorse() {
       if (!stream) { $("#camStatus").textContent = "Start camera first."; return; }
       if (scanning) return;
